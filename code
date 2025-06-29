@@ -1,1 +1,94 @@
+import os
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from PIL import Image
+from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from keras.layers import Input, Activation, Add, Dense, Conv2D, GlobalAveragePooling2D, MaxPooling2D
+from keras.layers import BatchNormalization, Dropout
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input
+from tensorflow.keras.optimizers import Adam
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from keras.models import Model
+from keras.utils import plot_model
+from sklearn.metrics import classification_report, confusion_matrix
+import warnings
+warnings.filterwarnings('ignore')
 
+dataset_path = 'https://www.kaggle.com/datasets/farzadnekouei/trash-type-image-dataset'
+
+# Retrieve the names of all folders (representing trash types) within the dataset directory
+garbage_types = os.listdir(dataset_path)
+
+# Set to store unique image dimensions for the entire dataset
+all_dimensions_set = set()
+
+# Iterate over each trash type (folder) to process images
+for garbage_type in garbage_types:
+    folder_path = os.path.join(dataset_path, garbage_type)
+    
+    # Verify that the current item is a directory
+    if os.path.isdir(folder_path):
+        image_files = [f for f in os.listdir(folder_path) if f.endswith(('jpg', 'jpeg'))]
+        
+        # Display the count of images in the current folder
+        num_images = len(image_files)
+        print(f"{garbage_type} folder contains {num_images} images.")
+        
+        # Loop over each image to check its dimensions
+        for image_file in image_files:
+            image_path = os.path.join(folder_path, image_file)
+            with Image.open(image_path) as img:
+                # Extract the width, height, and channels (color depth) of the image and add to the dimensions set
+                width, height = img.size
+                channels = len(img.getbands())
+                all_dimensions_set.add((width, height, channels))
+                
+# Determine if all images in the entore dataset have the same dimensions 
+if len(all_dimensions_set) == 1: 
+    width, height, channel = all_dimensions_set.pop()
+    print(f"\nAll images in the dataset have the same dimensions: {width}x{height} with {channels} color channels.")
+else:
+    print("\nThe images in the dataset have different dimensions or color channels.")
+
+for garbage_type in garbage_types:
+    folder_path = os.path.join(dataset_path, garbage_type)
+    
+    # Verify that the current item is a directory
+    if os.path.isdir(folder_path):
+        image_files = [f for f in os.listdir(folder_path) if f.endswith(('jpg', 'jpeg'))]
+        
+        # Select the first 10 images
+        image_files = image_files[:7]
+        
+        # Set up subplots
+        fig, axs = plt.subplots(1, 7, figsize=(15, 2))
+        
+        for i, image_file in enumerate(image_files):
+            image_path = os.path.join(folder_path, image_file)
+            with Image.open(image_path) as img:
+                axs[i].imshow(img)
+                axs[i].axis('off')
+        
+        plt.tight_layout()
+        fig.suptitle(garbage_type, fontsize=20, y=1.03)
+        plt.show()
+
+data = []
+
+# Loop through each garbage type and collect its images' file paths
+for garbage_type in garbage_types:
+    for file in os.listdir(os.path.join(dataset_path, garbage_type)):
+        # Append the image file path and its trash type (as a label) to the data list
+        data.append((os.path.join(dataset_path, garbage_type, file), garbage_type))
+
+# Convert the collected data into a DataFrame
+df = pd.DataFrame(data, columns=['filepath', 'label'])
+
+# Display the first few entries of the DataFrame
+df.head()
